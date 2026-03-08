@@ -31,7 +31,7 @@ router.get('/:id/readings', async (req, res) => {
     }
 
     let query = `
-    SELECT time, temperature, vibration, energy, pressure, rpm 
+    SELECT recorded_at as time, metric, value, unit 
     FROM sensor_readings 
     WHERE machine_id = $1
   `;
@@ -39,17 +39,17 @@ router.get('/:id/readings', async (req, res) => {
 
     if (from) {
         params.push(from);
-        query += ` AND time >= $${params.length}`;
+        query += ` AND recorded_at >= $${params.length}`;
     } else {
-        query += ` AND time >= NOW() - INTERVAL '1 hour'`;
+        query += ` AND recorded_at >= NOW() - INTERVAL '1 hour'`;
     }
 
     if (to) {
         params.push(to);
-        query += ` AND time <= $${params.length}`;
+        query += ` AND recorded_at <= $${params.length}`;
     }
 
-    query += ` ORDER BY time ASC LIMIT $${params.length + 1}`;
+    query += ` ORDER BY recorded_at ASC LIMIT $${params.length + 1}`;
     params.push(limit);
 
     try {

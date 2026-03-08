@@ -10,26 +10,22 @@ CREATE TABLE IF NOT EXISTS machines (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- sensor readings as TimescaleDB hypertable
+-- sensor readings
+DROP TABLE IF EXISTS sensor_readings CASCADE;
 CREATE TABLE IF NOT EXISTS sensor_readings (
-  time        TIMESTAMPTZ NOT NULL,
-  machine_id  UUID REFERENCES machines(id) ON DELETE CASCADE,
-  temperature FLOAT,
-  vibration   FLOAT,
-  energy      FLOAT,
-  pressure    FLOAT,
-  rpm         FLOAT
+  id BIGSERIAL PRIMARY KEY,
+  machine_id UUID NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+  metric VARCHAR(50) NOT NULL,
+  value DECIMAL(10,4) NOT NULL,
+  unit VARCHAR(20),
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Convert to hypertable if not already (Postgres 13+ supports if_not_exists in SQL but not all versions)
--- We'll handle this in the JS migration script for safety or rely on the extension being active.
--- For this demo, we assume TimescaleDB extension is active.
-DO $$ 
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'sensor_readings') THEN
-    PERFORM create_hypertable('sensor_readings', 'time');
-  END IF;
-END $$;
+CREATE INDEX IF NOT EXISTS idx_sensor_readings_machine_time 
+ON sensor_readings(machine_id, recorded_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sensor_readings_time 
+ON sensor_readings(recorded_at DESC);
 
 -- alerts
 CREATE TABLE IF NOT EXISTS alerts (

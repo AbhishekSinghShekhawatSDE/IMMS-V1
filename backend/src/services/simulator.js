@@ -84,12 +84,21 @@ async function startSimulator(io) {
                 const reading = generateReading(machine, globalTicks);
                 const timestamp = new Date();
 
-                // 1. Write to TimescaleDB (Async query, non-blocking)
-                pool.query(
-                    `INSERT INTO sensor_readings (time, machine_id, temperature, vibration, energy, rpm)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-                    [timestamp, machine.id, reading.temperature, reading.vibration, reading.energy, reading.rpm]
-                ).catch(e => console.error(`DB Write Error (${machine.name}):`, e.message));
+                // 1. Write to PostgreSQL (Each metric as its own row)
+                const metrics = [
+                    { metric: 'temperature', value: reading.temperature, unit: 'C' },
+                    { metric: 'vibration', value: reading.vibration, unit: 'mm/s' },
+                    { metric: 'energy', value: reading.energy, unit: 'kW' },
+                    { metric: 'rpm', value: reading.rpm, unit: 'RPM' }
+                ];
+
+                for (const m of metrics) {
+                    pool.query(
+                        `INSERT INTO sensor_readings (machine_id, metric, value, unit, recorded_at)
+                         VALUES ($1, $2, $3, $4, $5)`,
+                        [machine.id, m.metric, m.value, m.unit, timestamp]
+                    ).catch(e => console.error(`DB Write Error (${machine.name} - ${m.metric}):`, e.message));
+                }
 
                 // 2. Cache latest in Redis (30 second TTL)
                 const cachePayload = { ...reading, machine_id: machine.id, time: timestamp };
